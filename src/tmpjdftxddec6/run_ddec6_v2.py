@@ -16,7 +16,7 @@ from pymatgen.core.units import bohr_to_ang
 
 
 
-def add_redun_layer(d, axis):
+def add_redun_layer(d: np.ndarray, axis: int):
     S_old = list(np.shape(d))
     S_new = list(np.shape(d))
     S_new[axis] += 1
@@ -34,7 +34,7 @@ def add_redun_layer(d, axis):
         d_new[:,:,-1] += d[:,:,0]
     return d_new, S_new
 
-def sum_d_periodic_grid(d, pbc):
+def sum_d_periodic_grid(d: np.ndarray, pbc: list[bool]):
     S_sum = list(np.shape(d))
     for i, v in enumerate(pbc):
         if v:
@@ -42,7 +42,7 @@ def sum_d_periodic_grid(d, pbc):
     sum_d = np.sum(d[:S_sum[0], :S_sum[1], :S_sum[2]])
     return sum_d
 
-def get_pbc(calc_dir):
+def get_pbc(calc_dir: str):
     infname = opj(calc_dir, "in")
     lookkey = "coulomb-interaction"
     tokens = None
@@ -68,7 +68,7 @@ def get_pbc(calc_dir):
                 raise ValueError(f"Coulomb type {ctype} as found from {tokens} not yet supported for pbc detection.")
 
 
-def find_file_name(calc_dir, suffix, prefix):
+def find_file_name(calc_dir: str, suffix: str, prefix: str):
     filename = f"{prefix}{suffix}"
     file_path = opj(calc_dir, f"{filename}")
     if not ope(file_path):
@@ -127,51 +127,57 @@ def write_ddec6_inputs(
     if has_spin:
         write_ddec6_inputs_spin(calc_dir, outfile, dupfname, ddnfname, pbc, data_fname, a_d_env_path, max_space, norm_density=norm_density, offset=offset)
     else:
-        write_ddec6_inputs_nospin(calc_dir, outfile, dfname, pbc, data_fname, a_d_env_path, max_space)
+        write_ddec6_inputs_nospin(calc_dir, outfile, dfname, pbc, data_fname, a_d_env_path, max_space, norm_density=norm_density, offset=offset)
 
-def write_ddec6_inputs_nospin(calc_dir, outfile, dfname, pbc, data_fname, a_d_path, max_space):
-    jof = JDFTXOutfile.from_file(outfile)
+def write_ddec6_inputs_nospin(
+        calc_dir: str, outfile_path: str, dfname: str, pbc: list[bool], 
+        data_fname: str, a_d_path: str, max_space: float | None,
+        norm_density=False, offset: float = 0.0
+        ):
+    jof = JDFTXOutfile.from_file(outfile_path)
     structure = jof.structure
-    _S = get_density_shape(outfile)
+    _S = get_density_shape(outfile_path)
     d = get_density_arrays(calc_dir, _S, [dfname])[0]
     if not max_space is None:
         d, S = check_grid(d, structure, max_space)
     for i in range(3):
         d, S = add_redun_layer(d, i)
-    d = get_normed_d(d, structure, outfile, pbc, S, _S)
+    if norm_density:
+        d = get_normed_d(d, structure, outfile_path, pbc, S, _S, offset_count=offset)
     write_xsf(calc_dir, structure, S, d, data_fname=data_fname)
-    write_job_control(calc_dir, structure, f"{data_fname}.XSF", outfile, pbc, a_d_path)
+    write_job_control(calc_dir, structure, f"{data_fname}.XSF", outfile_path, pbc, a_d_path)
 
-def write_ddec6_inputs_spin(calc_dir, outfile, dupfname, ddnfname, pbc, data_fname, a_d_path, max_space, norm_density=False, offset=0):
-    jof = JDFTXOutfile.from_file(outfile)
+def write_ddec6_inputs_spin(
+        calc_dir: str, outfile_path: str, dupfname: str, ddnfname: str, 
+        pbc: list[bool], data_fname: str, a_d_path: str, max_space: list[bool], 
+        norm_density=False, offset: float = 0.0
+        ):
+    jof = JDFTXOutfile.from_file(outfile_path)
     structure = jof.structure
-    _S = get_density_shape(outfile)
+    _S = get_density_shape(outfile_path)
     d_up, d_dn = get_density_arrays(calc_dir, _S, [dupfname, ddnfname])
     if not max_space is None:
         d_up, S = check_grid(d_up, structure, max_space)
         d_dn, S = check_grid(d_dn, structure, max_space)
-    #S = _S
     for i in range(3):
         d_up, S = add_redun_layer(d_up, i)
         d_dn, S = add_redun_layer(d_dn, i)
     if norm_density:
-        d_up, d_dn = get_normed_ds(d_up, d_dn, structure, outfile, pbc, S, _S, offset_count=offset)
+        d_up, d_dn = get_normed_ds(d_up, d_dn, structure, outfile_path, pbc, S, _S, offset_count=offset)
     write_xsf(calc_dir, structure, S, d_up, d_dn=d_dn, data_fname=data_fname)
-    write_job_control(calc_dir, structure, f"{data_fname}.XSF", outfile, pbc, a_d_path)
+    write_job_control(calc_dir, structure, f"{data_fname}.XSF", outfile_path, pbc, a_d_path)
 
-def run_ddec6(calc_dir, _exe_path=None):
-    if _exe_path is None:
-        _exe_path = exe_path
+def run_ddec6(calc_dir: str, exe_path: str):
     chdir(calc_dir)
     print(f"Running ddec6 in {calc_dir}")
-    run(f"{_exe_path}", shell=True, check=True)
+    run(f"{exe_path}", shell=True, check=True)
 
 
-def get_density_shape(outfile):
-    start = get_start_line(outfile)
+def get_density_shape(outfile_path: str):
+    start = get_start_line(outfile_path)
     Sdone = False
     S = None
-    for i, line in enumerate(open(outfile)):
+    for i, line in enumerate(open(outfile_path)):
         if i > start:
             if (not Sdone) and line.startswith('Chosen fftbox size'):
                 S = np.array([int(x) for x in line.split()[-4:-1]])
@@ -179,10 +185,10 @@ def get_density_shape(outfile):
     if not S is None:
         return S
     else:
-        raise ValueError(f"Issue finding density array shape 'S' from out file {outfile}")
+        raise ValueError(f"Issue finding density array shape 'S' from out file {outfile_path}")
 
 
-def get_density_arrays(calc_dir, S, dfnames):
+def get_density_arrays(calc_dir: str, S: list[int], dfnames: list[str]):
     d_arrs = [np.fromfile(opj(calc_dir, dfname)) for dfname in dfnames]
     for i, d_arr in enumerate(d_arrs):
         d_arrs[i] = correct_density_for_negative(d_arr)
@@ -196,6 +202,14 @@ def correct_density_for_negative(d: np.ndarray):
     return d
 
 def interp_3d_array(array_in, S_want):
+    """ Return an interpolated density array.
+
+    Return an interpolated density array.
+
+    Args:
+        array_in (np.ndarray): Density array of shape S
+        S_want (list[int]): Densired shape of density array.
+    """
     S_cur = np.shape(array_in)
     cx = np.linspace(0, 1, S_cur[0])
     cy = np.linspace(0, 1, S_cur[1])
@@ -236,6 +250,17 @@ def adjust_grid(d, structure: Structure, maxspace, adjust_bools):
     return d, S_want
 
 def check_grid(d, structure: Structure, maxspace=0.09):
+    """ Check density grid for adequate spacing.
+
+    Check density grid for adequate spacing. Returns an interpolated grid with finer spacing if
+    grid does not pass criteria set in maxspace.
+
+    Args:
+        d (np.ndarray): Electron density array of shape S.
+        structure (Structure): Pymatgen Structure object of structure used in jdftx calculation.
+            Needed to get lattice vector lengths.
+        maxspace (float): Maximum length in Anstroms allowed for a voxel.
+    """
     cell = structure.lattice.matrix
     S = np.shape(d)
     spacings = [np.linalg.norm(cell[i])/np.shape(d)[i] for i in range(3)]
@@ -246,25 +271,15 @@ def check_grid(d, structure: Structure, maxspace=0.09):
         print(f"New spacings: {[np.linalg.norm(cell[i])/np.shape(d)[i] for i in range(3)]}")
     return d, S
 
-def get_normed_d(d, structure: Structure, outfile, pbc, S, _S):
-    """
-    :param d:  Density array
-    :param structure: pmg structure object
-    :param outfile: path to out file
-    :param pbc: List of bools indicating periodic boundary conditions
-    :param S: Current shape of d (after adding redundant layers)
-    :param _S: Shape of fftbox from JDFTx calculation
-    :return:
-    """
-    tot_zval = get_target_tot_zval(structure, outfile)
-    pix_vol = structure.lattice.volume/(np.prod(np.shape(d))*(bohr_to_ang**3))
-    sum_d = sum_d_periodic_grid(d, pbc) # excludes final layer for each axis that is periodic (pbc = list of bools)
-    # sum_d = np.sum(d)
-    d_new = (d*tot_zval/(pix_vol*sum_d*(np.prod(S)/np.prod(_S))))
-    return d_new
+# def get_normed_d(d, structure: Structure, outfile_path: str, pbc: list[bool], S: list[int], _S: list[int]):
+#     tot_zval = get_target_tot_zval(structure, outfile_path)
+#     pix_vol = structure.lattice.volume/(np.prod(np.shape(d))*(bohr_to_ang**3))
+#     sum_d = sum_d_periodic_grid(d, pbc) # excludes final layer for each axis that is periodic (pbc = list of bools)
+#     # sum_d = np.sum(d)
+#     d_new = (d*tot_zval/(pix_vol*sum_d*(np.prod(S)/np.prod(_S))))
+#     return d_new
 
 def get_normed_ds(d_up, d_dn, structure: Structure, outfile, pbc, S, _S, offset_count=0):
-    pbc = [True, True, True] # Override in accordance to how density XSF is written
     tot_zval = get_target_tot_zval(structure, outfile) + offset_count
     pix_vol = structure.lattice.volume / (np.prod(_S) * (bohr_to_ang ** 3))
     sum_d_up = sum_d_periodic_grid(d_up, pbc)
@@ -280,6 +295,20 @@ def get_normed_ds(d_up, d_dn, structure: Structure, outfile, pbc, S, _S, offset_
     d_up_new = d_up*coef
     d_dn_new = d_dn*coef
     return d_up_new, d_dn_new
+
+def get_normed_d(d, structure: Structure, outfile_path: str, pbc: list[bool], S: list[int], _S: list[int], offset_count=0):
+    tot_zval = get_target_tot_zval(structure, outfile_path) + offset_count
+    pix_vol = structure.lattice.volume / (np.prod(_S) * (bohr_to_ang ** 3))
+    sum_d = sum_d_periodic_grid(d, pbc)
+    print(f"tot_zval: {tot_zval}")
+    print(f"pix_vol: {pix_vol}")
+    print(f"sum_d: {sum_d}")
+    print(f"prod_S: {np.prod(S)}")
+    print(f"prod_S_: {np.prod(_S)}")
+    coef = (tot_zval / (pix_vol * sum_d * (np.prod(S) / np.prod(_S))))
+    print(f"coef: {coef}")
+    d = d*coef
+    return d
 
 def write_xsf(calc_dir, structure: Structure, S, d_up, d_dn = None, data_fname="density"):
     xsf_str = make_xsf_str(structure, S, d_up, d_dn, data_fname)
@@ -596,7 +625,7 @@ def run_ddec6_runner(calc_dir: str, a_d_env_path: str, pbc: list[bool], exe_env_
                 no prefix.
     """
     write_ddec6_inputs(calc_dir, max_space=None, a_d_env_path=a_d_env_path, pbc=pbc, norm_density=norm, offset=offset, file_prefix=file_prefix)
-    run_ddec6(calc_dir, _exe_path=exe_env_path)
+    run_ddec6(calc_dir, exe_env_path)
 
 
 def get_ddec6_output_nvalence(density_output):
