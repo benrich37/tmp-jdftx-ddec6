@@ -87,21 +87,30 @@ def find_file_name(calc_dir, suffix, prefix):
 
 
 
-def write_ddec6_inputs(calc_dir, 
-                       data_fname="density", pbc=None, a_d_path=None, max_space=None, norm_density=False, offset=0,
-                       file_prefix=""):
+def write_ddec6_inputs(
+        calc_dir: str, 
+        data_fname: str = "density", 
+        pbc: list[bool] | None = None, 
+        a_d_env_path: str = None, 
+        max_space=None, 
+        norm_density=False, 
+        offset=0,
+        file_prefix=""
+        ):
     """
-    :param calc_dir: Path to directory containing calc output files needed for ddec6
-    :param outname: file name for out file
-    :param dfname: file name for total density array
-    :param dupfname: file name for spin up density array
-    :param ddnfname: file name for spin down density array
-    :param data_fname: string to assign XSF and job name (arbitrary)
-    :param pbc: List of bools indicating axes which using periodic boundary conition
-    :param a_d_path: Path to atomic_densities directory
-    :param max_space: Max spacing (in A) between adjacent points on density grid (density grid adjusted via linear interpolation)
-    :param norm_density: Normalize to expected electron count
-    :return:
+        Write required input files for running chargemol for ddec6 analysis..
+
+        Args:
+            calc_dir (str): The path to the directory containing the JDFTx out files.
+            data_fname (str): Name of xsf file to write density as. Arbitrary, but changable incase "density.xsf"
+                breaks something for you.
+            pbc (list[bool, bool, bool]): List of the periodic boundary conditions for the calculation. 
+            a_d_env_path (str): The path to the atomic density files.
+            max_space: I don't remember
+            offset (float | int): Offset to add to density array(s). Made non-zero if default normalization isn't
+                good enough for little ol chargemol.
+            file_prefix (str): Prefix for jdftx output files `out` and `n`/`n_up`/`n_dn` (ie put "jdftx." if your out file is
+                "jdftx.out"). Leave as empty string if no prefix.
     """
     outname = find_file_name(calc_dir, "out", file_prefix)
     if outname is None:
@@ -113,18 +122,18 @@ def write_ddec6_inputs(calc_dir,
     print(dupfname)
     if pbc is None:
         pbc = get_pbc(calc_dir)
-    if a_d_path is None:
-        a_d_path = a_d_default
+    if a_d_env_path is None:
+        a_d_env_path = a_d_default
     outfile = opj(calc_dir, outname)
-    non_col = True # Non_col means spin up and down are separated
+    has_spin = True
     if dfname is None:
-        non_col = True
+        has_spin = True
     elif dupfname is None:
         raise ValueError("Could not find electron density files")
-    if non_col:
-        write_ddec6_inputs_spin(calc_dir, outfile, dupfname, ddnfname, pbc, data_fname, a_d_path, max_space, norm_density=norm_density, offset=offset)
+    if has_spin:
+        write_ddec6_inputs_spin(calc_dir, outfile, dupfname, ddnfname, pbc, data_fname, a_d_env_path, max_space, norm_density=norm_density, offset=offset)
     else:
-        write_ddec6_inputs_nospin(calc_dir, outfile, dfname, pbc, data_fname, a_d_path, max_space)
+        write_ddec6_inputs_nospin(calc_dir, outfile, dfname, pbc, data_fname, a_d_env_path, max_space)
 
 def write_ddec6_inputs_nospin(calc_dir, outfile, dfname, pbc, data_fname, a_d_path, max_space):
     jof = JDFTXOutfile.from_file(outfile)
@@ -569,8 +578,19 @@ def ran_successfully(calc_dir):
     return ope(opj(calc_dir, "DDEC6_even_tempered_net_atomic_charges.xyz"))
 
 
-def run_ddec6_runner(calc_dir, a_d_env_path, pbc, exe_env_path, norm=False, offset=0,file_prefix=""):
-    write_ddec6_inputs(calc_dir, max_space=None, a_d_path=a_d_env_path, pbc=pbc, norm_density=norm, offset=offset, file_prefix=file_prefix)
+def run_ddec6_runner(calc_dir: str, a_d_env_path: str, pbc: list[bool], exe_env_path: str, norm: bool = False, offset: float | int = 0, file_prefix: str = ""):
+    """
+        Write required input files and run chargemol for ddec6 analysis..
+
+        Args:
+            calc_dir (str): The path to the directory containing the JDFTx out files.
+            a_d_env_path (str): The path to the atomic density files.
+            pbc (list[bool, bool, bool]): List of the periodic boundary conditions for the calculation. 
+            exe_env_path (str): The path to the chargemol executable.
+            file_prefix (str): Prefix for jdftx output files `out` and `n`/`n_up`/`n_dn`. Leave as empty string if
+                no prefix.
+    """
+    write_ddec6_inputs(calc_dir, max_space=None, a_d_env_path=a_d_env_path, pbc=pbc, norm_density=norm, offset=offset, file_prefix=file_prefix)
     run_ddec6(calc_dir, _exe_path=exe_env_path)
 
 
@@ -608,7 +628,21 @@ def adjust_offset(offset, calc_dir):
 
 
 
-def run_ddec6_looper(calc_dir, a_d_env_path, pbc, exe_env_path, file_prefix=""):
+def run_ddec6_looper(calc_dir: str, a_d_env_path: str, pbc: list[bool], exe_env_path: str, file_prefix: str = ""):
+    """
+        Loop the function `run_ddec6_runner`, allowing for adjustable normalization offsets incase of incorrect density sum.
+
+        Args:
+            calc_dir (str): The path to the directory containing the JDFTx out files.
+            a_d_env_path (str): The path to the atomic density files. (Note - this MUST end with "/" (or whatever delimiter
+                is used by the file system), otherwise chargemol will look for files named "atomic_densitiesc2_033..."
+                instead of "atomic_densities/c2_033...").
+            pbc (list[bool, bool, bool]): List of the periodic boundary conditions for the calculation. Used to inform
+                where to add redundant layering.
+            exe_env_path (str): The path to the chargemol executable.
+            file_prefix (str): Prefix for jdftx output files `out` and `n`/`n_up`/`n_dn` (ie put "jdftx." if your out file is
+                "jdftx.out"). Leave as empty string if no prefix.
+    """
     success = False
     run_ddec6_runner(calc_dir, a_d_env_path, pbc, exe_env_path, file_prefix=file_prefix)
     success = ran_successfully(calc_dir)
@@ -640,8 +674,12 @@ a_d_key = "DDEC6_AD_PATH"
 exe_key = "DDEC6_EXE_PATH"
 
 
-def main(calc_dir=None, a_d_env_path=None, exe_env_path=None, file_prefix=""):
-    pbc = [True, True, True] # override
+def main(calc_dir: str = None, a_d_env_path: str = None, exe_env_path: str = None, file_prefix: str = ""):
+    pbc = [True, True, True] # Hard-coding the periodic boundary condition to all True for now
+    # Hypothetically, the pbc should inform the program which axes to add redundant layering to.
+    # However, I've only achieved successful runs without guess-normalizing by setting all to True.
+    # This needs to be tested and refined more, because it still feels like I did something wrong with that,
+    # but the difference in results is pretty minimal so I'm leaving it as so for now.
     if calc_dir is None:
         calc_dir = getcwd()
     if a_d_key in environ:
@@ -652,6 +690,5 @@ def main(calc_dir=None, a_d_env_path=None, exe_env_path=None, file_prefix=""):
     # a finer density grid.
     run_ddec6_looper(calc_dir, a_d_env_path, pbc, exe_env_path, file_prefix=file_prefix)
 
-
 if __name__ == "__main__":
-    main(a_d_env_path=a_d_local_path, exe_env_path=exe_local_path_parallel)
+    main(a_d_env_path=a_d_default, exe_env_path=exe_path_default)
