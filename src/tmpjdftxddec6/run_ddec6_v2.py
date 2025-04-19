@@ -133,7 +133,7 @@ def write_ddec6_inputs_nospin(calc_dir, outfile, dfname, pbc, data_fname, a_d_pa
     jof = JDFTXOutfile.from_file(outfile)
     structure = jof.structure
     _S = get_density_shape(outfile)
-    d = get_density_array(calc_dir, _S, dfname)
+    d = get_density_arrays(calc_dir, _S, [dfname])[0]
     if not max_space is None:
         d, S = check_grid(d, structure, max_space)
     for i in range(3):
@@ -146,7 +146,7 @@ def write_ddec6_inputs_spin(calc_dir, outfile, dupfname, ddnfname, pbc, data_fna
     jof = JDFTXOutfile.from_file(outfile)
     structure = jof.structure
     _S = get_density_shape(outfile)
-    d_up, d_dn = get_density_arrays(calc_dir, _S, dupfname, ddnfname)
+    d_up, d_dn = get_density_arrays(calc_dir, _S, [dupfname, ddnfname])
     if not max_space is None:
         d_up, S = check_grid(d_up, structure, max_space)
         d_dn, S = check_grid(d_dn, structure, max_space)
@@ -181,33 +181,19 @@ def get_density_shape(outfile):
     else:
         raise ValueError(f"Issue finding density array shape 'S' from out file {outfile}")
 
-def get_density_array(calc_dir, S, dfname):
-    d = np.fromfile(opj(calc_dir, dfname))
-    for i, v in enumerate(d):
-        d[i] = max(v, float(0))
-    d = d.reshape(S)
-    return d
 
-# def get_density_arrays(calc_dir, S, dupfname, ddnfname):
-#     d_up = np.fromfile(opj(calc_dir, dupfname))
-#     d_dn = np.fromfile(opj(calc_dir, ddnfname))
-#     d_up = d_up.reshape(S)
-#     d_dn = d_dn.reshape(S)
-#     return d_up, d_dn
-
-def get_density_arrays(calc_dir, S, dupfname, ddnfname):
-    d_arrs = [
-        np.fromfile(opj(calc_dir, dupfname)),
-        np.fromfile(opj(calc_dir, ddnfname))
-    ]
+def get_density_arrays(calc_dir, S, dfnames):
+    d_arrs = [np.fromfile(opj(calc_dir, dfname)) for dfname in dfnames]
     for i, d_arr in enumerate(d_arrs):
-        prevsum = np.sum(d_arr.flatten())
-        for j, v in enumerate(d_arr):
-            d_arr[j] = max(v, float(0))
-        d_arrs[i] *= prevsum/np.sum(d_arrs[i].flatten())
+        d_arrs[i] = correct_density_for_negative(d_arr)
         d_arrs[i] = d_arrs[i].reshape(S)
-
     return d_arrs
+
+def correct_density_for_negative(d: np.ndarray):
+    prevsum = np.sum(d.flatten())
+    d = np.maximum(d, np.zeros(len(d)))
+    d *= prevsum/np.sum(d.flatten())
+    return d
 
 def interp_3d_array(array_in, S_want):
     S_cur = np.shape(array_in)
