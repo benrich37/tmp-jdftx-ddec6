@@ -302,6 +302,25 @@ def write_job_control(calc_dir, structure: Structure, xsf_fname, outfile, pbc, a
         f.write(job_control_str)
     f.close()
 
+def write_job_control_alt(calc_dir, structure: Structure, xsf_fname, outfile_path, pbc, a_d_path):
+    # Alternate version that only uses JDFTXOutfile data
+    outfile = JDFTXOutfile.from_file(outfile_path)
+    #nelecs = get_n_elecs(outfile_path)
+    nelecs = outfile.total_electrons
+    atom_type_count_dict = get_atom_type_count_dict(structure)
+    atom_types = list(atom_type_count_dict.keys())
+    # TODO: Write in the "valence_electrons_uncharged_dict" into the jdftxoutfileslice
+    atom_type_core_elecs_dict = get_atom_type_core_elecs_dict(atom_types, outfile_path)
+    #atom_type_core_elecs_dict = get_atom_type_core_elecs_dict_alt(outfile)
+    #elecs_per_atom_type_for_neutral_dict = get_elecs_per_atom_type_for_neutral_dict(atom_type_core_elecs_dict)
+    #elecs_for_neutral = get_elecs_for_neutral(atom_type_count_dict, elecs_per_atom_type_for_neutral_dict)
+    elecs_for_neutral = outfile.total_electrons_uncharged
+    net_charge = elecs_for_neutral - nelecs
+    job_control_str = get_job_control_str(net_charge, pbc, xsf_fname, atom_type_core_elecs_dict, a_d_path)
+    with open(opj(calc_dir, "job_control.txt"), "w") as f:
+        f.write(job_control_str)
+    f.close()
+
 #####################
 
 def get_job_control_str(net_charge, pbc, xsf_fname, atom_type_core_elecs_dict, a_d_path):
@@ -377,7 +396,13 @@ def get_elecs_per_atom_type_for_neutral_dict(atom_type_core_elecs_dict):
         elecs_per_atom_type_for_neutral_dict[el] = req_elecs
     return elecs_per_atom_type_for_neutral_dict
 
-def get_atom_type_core_elecs_dict(atom_types, outfile):
+def get_atom_type_core_elecs_dict(atom_types, outfile: str):
+    atom_type_core_elecs_dict = {}
+    for el in atom_types:
+        atom_type_core_elecs_dict[el] = get_atom_type_core_elecs(el, outfile)
+    return atom_type_core_elecs_dict
+
+def get_atom_type_core_elecs_dict_alt(outfile: JDFTXOutfile):
     atom_type_core_elecs_dict = {}
     for el in atom_types:
         atom_type_core_elecs_dict[el] = get_atom_type_core_elecs(el, outfile)
