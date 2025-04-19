@@ -198,9 +198,12 @@ def get_density_arrays(calc_dir, S, dupfname, ddnfname):
         np.fromfile(opj(calc_dir, ddnfname))
     ]
     for i, d_arr in enumerate(d_arrs):
+        prevsum = np.sum(d_arr.flatten())
         for j, v in enumerate(d_arr):
             d_arr[j] = max(v, float(0))
+        d_arrs[i] *= prevsum/np.sum(d_arrs[i].flatten())
         d_arrs[i] = d_arrs[i].reshape(S)
+
     return d_arrs
 
 def interp_3d_array(array_in, S_want):
@@ -671,7 +674,7 @@ exe_path_default = "/global/cfs/cdirs/m4025/Software/Perlmutter/ddec6/chargemol_
 
 # Set these to an environmental variable to override the default strings above
 
-#from research import ext_4tb
+from research import ext_4tb
 #a_d_local_path = str(ext_4tb / "chargemol_09_26_2017" / "atomic_densities")
 #a_d_local_path = r"/home/beri9208/ddec6/chargemol_09_26_2017/atomic_densities/"
 #exe_local_path_serial = str(ext_4tb / "chargemol_09_26_2017" / "chargemol_FORTRAN_09_26_2017" / "compiled_binaries" / "linux" / "Chargemol_09_26_2017_linux_serial")
