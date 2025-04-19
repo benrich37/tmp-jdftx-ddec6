@@ -565,34 +565,6 @@ def make_primcoord_str(structure: Structure):
     return dump_str
 
 
-########## FUNCTION GRAVEYARD ##########
-#
-# def remove_redun_layer(d, axis):
-#     S_new = list(np.shape(d))
-#     S_new[axis] -= 1
-#     d_new = np.zeros(S_new)
-#     for i in range(S_new[0]):
-#         for j in range(S_new[1]):
-#             for k in range(S_new[2]):
-#                 d_new[i, j, k] += d[i, j, k]
-#     return d_new, S_new
-#
-# def print_all_factors(factors, exponents, base=1.0):
-#     nf = len(factors)
-#     ne = len(exponents)
-#     ni = ne**(nf)
-#     for i in range(ni):
-#         exps = []
-#         for f in range(nf):
-#             exp_f = int(np.floor((i % (ne**(f+1)))/(ne**f)))
-#             exps.append(exp_f)
-#         exps = [exponents[exp] for exp in exps]
-#         convs = [float(factors[f])**(exps[f]) for f in range(nf)]
-#         conv = np.prod(convs)*base
-#         print(str(conv) + ": [" + ", ".join([str(exp) for exp in exps]) + "]")
-#
-########################################
-
 def ran_successfully(calc_dir):
     return ope(opj(calc_dir, "DDEC6_even_tempered_net_atomic_charges.xyz"))
 
@@ -635,18 +607,6 @@ def adjust_offset(offset, calc_dir):
     return offset
 
 
-# def get_offset(calc_dir):
-#     output_file = opj(calc_dir, "density.output")
-#     if ope(output_file):
-#         with open(output_file, "r") as f:
-#             for line in f:
-#                 if "checkme" in line:
-#                     offset = float(line.split("=")[1].strip())
-#         f.close()
-#         return offset
-#     else:
-#         raise FileNotFoundError(f"Could not find {output_file}")
-
 
 def run_ddec6_looper(calc_dir, a_d_env_path, pbc, exe_env_path, file_prefix=""):
     success = False
@@ -673,16 +633,6 @@ a_d_default = "/global/cfs/cdirs/m4025/Software/Perlmutter/ddec6/chargemol_09_26
 exe_path_default = "/global/cfs/cdirs/m4025/Software/Perlmutter/ddec6/chargemol_09_26_2017/chargemol_FORTRAN_09_26_2017/compiled_binaries/linux/Chargemol_09_26_2017_linux_parallel"
 
 # Set these to an environmental variable to override the default strings above
-
-from research import ext_4tb
-#a_d_local_path = str(ext_4tb / "chargemol_09_26_2017" / "atomic_densities")
-#a_d_local_path = r"/home/beri9208/ddec6/chargemol_09_26_2017/atomic_densities/"
-#exe_local_path_serial = str(ext_4tb / "chargemol_09_26_2017" / "chargemol_FORTRAN_09_26_2017" / "compiled_binaries" / "linux" / "Chargemol_09_26_2017_linux_serial")
-#exe_local_path_parallel = str(ext_4tb / "chargemol_09_26_2017" / "chargemol_FORTRAN_09_26_2017" / "compiled_binaries" / "linux" / "Chargemol_09_26_2017_linux_parallel")
-#exe_local_path_serial_mac = str(ext_4tb / "chargemol_09_26_2017" / "chargemol_FORTRAN_09_26_2017" / "compiled_binaries" / "mac" / "Chargemol_09_26_2017_mac_serial")
-#exe_local_path_parallel_mac = str(ext_4tb / "chargemol_09_26_2017" / "chargemol_FORTRAN_09_26_2017" / "compiled_binaries" / "mac" / "Chargemol_09_26_2017_mac_parallel")
-#exe_local_path_serial = r"/home/beri9208/ddec6/chargemol_09_26_2017/chargemol_FORTRAN_09_26_2017/compiled_binaries/linux/Chargemol_09_26_2017_linux_serial"
-#exe_local_path_parallel = r"/home/beri9208/ddec6/chargemol_09_26_2017/chargemol_FORTRAN_09_26_2017/compiled_binaries/linux/Chargemol_09_26_2017_linux_parallel"
 
 a_d_default = a_d_default
 exe_path = exe_path_default
