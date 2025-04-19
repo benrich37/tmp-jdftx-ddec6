@@ -1,0 +1,5 @@
+[project]
+name = "tmpjdftxddec6"
+dynamic = ["version"]
+requires-python = ">=3.10"
+authors = [{ name = "Ben Rich", email = "benjamin.rich@colorado.edu" }]

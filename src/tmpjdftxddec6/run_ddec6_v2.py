@@ -14,13 +14,7 @@ from pymatgen.core.units import bohr_to_ang
 # - replace xsf with CHGCAR
 # - interface with pymatgen.commands.ddec
 
-a_d_varname = None
-exe_path_varname = None
 
-if not a_d_varname is None:
-    a_d_default = environ[a_d_varname]
-if not exe_path_varname is None:
-    exe_path = environ[exe_path_varname]
 
 def add_redun_layer(d, axis):
     S_old = list(np.shape(d))
@@ -663,13 +657,6 @@ def run_ddec6_looper(calc_dir: str, a_d_env_path: str, pbc: list[bool], exe_env_
 
 pbc_default = [True, True, True]
 
-a_d_default = "/global/cfs/cdirs/m4025/Software/Perlmutter/ddec6/chargemol_09_26_2017/atomic_densities/"
-exe_path_default = "/global/cfs/cdirs/m4025/Software/Perlmutter/ddec6/chargemol_09_26_2017/chargemol_FORTRAN_09_26_2017/compiled_binaries/linux/Chargemol_09_26_2017_linux_parallel"
-
-# Set these to an environmental variable to override the default strings above
-
-a_d_default = a_d_default
-exe_path = exe_path_default
 a_d_key = "DDEC6_AD_PATH"
 exe_key = "DDEC6_EXE_PATH"
 
@@ -691,4 +678,4 @@ def main(calc_dir: str = None, a_d_env_path: str = None, exe_env_path: str = Non
     run_ddec6_looper(calc_dir, a_d_env_path, pbc, exe_env_path, file_prefix=file_prefix)
 
 if __name__ == "__main__":
-    main(a_d_env_path=a_d_default, exe_env_path=exe_path_default)
+    main()
