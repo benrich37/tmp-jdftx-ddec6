@@ -8,6 +8,7 @@ from pymatgen.io.jdftx.outputs import JDFTXOutfile
 from pymatgen.core import Structure
 from pymatgen.core.periodic_table import Element
 from pymatgen.core.units import bohr_to_ang
+from pathlib import Path
 
 # TODO:
 # - replace ASE with pymatgen
@@ -110,12 +111,8 @@ def write_ddec6_inputs(
     dfname = find_file_name(calc_dir, "n", file_prefix)
     dupfname = find_file_name(calc_dir, "n_up", file_prefix)
     ddnfname = find_file_name(calc_dir, "n_dn", file_prefix)
-    print(dfname)
-    print(dupfname)
     if pbc is None:
         pbc = get_pbc(calc_dir)
-    if a_d_env_path is None:
-        a_d_env_path = a_d_default
     outfile = opj(calc_dir, outname)
     has_spin = True
     if dfname is None:
@@ -707,10 +704,28 @@ def main(calc_dir: str = None, a_d_env_path: str = None, exe_env_path: str = Non
     # but the difference in results is pretty minimal so I'm leaving it as so for now.
     if calc_dir is None:
         calc_dir = getcwd()
-    if a_d_key in environ:
-        a_d_env_path = environ[a_d_key]
-    if exe_key in environ:
-        exe_env_path = environ[exe_key]
+    if exe_env_path is None:
+        if exe_key in environ:
+            exe_env_path = environ[exe_key]
+        else:
+            raise ValueError(f"Environment variable {exe_key} not set. Please set it to the path of the chargemol executable.")
+    if a_d_env_path is None:
+        if a_d_key in environ:
+            a_d_env_path = environ[a_d_key]
+        else:
+            # Assume executable is in the pre-compiled binary directory
+            option1 = Path(exe_env_path).parent.parent.parent.parent / "atomic_densities"
+            # Or compiled within one of the sourcecode directories
+            option2 = Path(exe_env_path).parent.parent.parent / "atomic_densities"
+            if option1.exists():
+                a_d_env_path = str(option1)
+            elif option2.exists():
+                a_d_env_path = str(option2)
+            else:
+                raise ValueError(f"Could not find atomic density files in {option1} or {option2}. Please set {a_d_key}.")
+    if not a_d_env_path.endswith("/") and not a_d_env_path.endswith("\\"):
+        a_d_env_path += "/"
+
     # If your fftbox is too coarse, adding max_space=0.1 can force ddec6 to work with a linear interpolation onto
     # a finer density grid.
     run_ddec6_looper(calc_dir, a_d_env_path, pbc, exe_env_path, file_prefix=file_prefix)
