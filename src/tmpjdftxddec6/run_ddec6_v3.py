@@ -11,7 +11,6 @@ from pymatgen.core.units import bohr_to_ang
 from pathlib import Path
 
 # TODO:
-# - replace ASE with pymatgen
 # - replace xsf with CHGCAR
 # - interface with pymatgen.commands.ddec
 
@@ -71,9 +70,11 @@ def find_file_name(calc_dir: str, suffix: str, prefix: str):
     filename = f"{prefix}{suffix}"
     file_path = opj(calc_dir, f"{filename}")
     if not ope(file_path):
+        print(f"Could not find file {file_path}, trying without prefix {prefix}")
         filename = suffix
-        file_path = opj(calc_dir, f"{filename}")
+        file_path = opj(calc_dir, f"{file_path}")
     if not ope(file_path):
+        print(f"Could not find file {file_path} either, returning None")
         return None
     return filename
         
@@ -114,11 +115,11 @@ def write_ddec6_inputs(
     if pbc is None:
         pbc = get_pbc(calc_dir)
     outfile = opj(calc_dir, outname)
-    has_spin = True
+    has_spin = False
     if dfname is None:
         has_spin = True
-    elif dupfname is None:
-        raise ValueError("Could not find electron density files")
+        if dupfname is None:
+            raise ValueError(f"Could not find electron density files with prefix {file_prefix} in {calc_dir}")
     if has_spin:
         write_ddec6_inputs_spin(calc_dir, outfile, dupfname, ddnfname, pbc, data_fname, a_d_env_path, max_space, norm_density=norm_density, offset=offset)
     else:
@@ -646,6 +647,8 @@ def get_checkme(calc_dir):
     integrated = get_ddec6_output_integ_valence(density_output)
     print(f"nval: {nvalance}")
     print(f"integ: {integrated}")
+    if ((nvalance is None) or (integrated is None)):
+        raise ValueError(f"Could not find nvalence or integrated valence density in {density_output}. Cannot adjust offset. Please check density.output file.")
     checkme = integrated - nvalance
     return checkme
 
